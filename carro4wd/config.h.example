@@ -1,0 +1,19 @@
+#pragma once
+// Carrinho 4WD - config local (NAO vai pro git). WiFi = as mesmas credenciais do projeto do Atom.
+#define WIFI_SSID     "SEU_WIFI_AQUI"
+#define WIFI_PASS     "SUA_SENHA_AQUI"
+
+// AP de emergencia (usado se o WiFi de casa nao responder em 15 s)
+#define AP_SSID   "4WD-Car"
+#define AP_PASS   "carrinho4wd"
+
+// Pinos do shield HW-588A ("ESP Motor Shield" L293D)
+#define PIN_DIR_VEL  5    // D1 - PWM motor direito
+#define PIN_DIR_DIR  0    // D3 - direcao motor direito
+#define PIN_ESQ_VEL  4    // D2 - PWM motor esquerdo
+#define PIN_ESQ_DIR  2    // D4 - direcao motor esquerdo
+#define MOTOR_DIR_INVERTIDO 0   // coloque 1 se o lado direito girar ao contrario
+#define MOTOR_ESQ_INVERTIDO 0
+
+#define DEADMAN_MS   700   // para sozinho se o comando parar de chegar
+#define VEL_PADRAO   200
