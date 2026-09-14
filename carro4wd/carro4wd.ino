@@ -61,6 +61,17 @@ void motorParar(int pinVel) { analogWrite(pinVel, 0); }
 
 void aplicar(char a) {
   int v = velocidade;
+  // partida: se estava parado, dá um pulso em 100% por 120 ms (vence a inércia/atrito)
+  bool partindo = (acao == 's' && a != 's');
+  if (partindo) {
+    switch (a) {
+      case 'f': motorFrente(PIN_DIR_VEL, PIN_DIR_DIR, 255, MOTOR_DIR_INVERTIDO); motorFrente(PIN_ESQ_VEL, PIN_ESQ_DIR, 255, MOTOR_ESQ_INVERTIDO); break;
+      case 't': motorTras(PIN_DIR_VEL, PIN_DIR_DIR, 255, MOTOR_DIR_INVERTIDO); motorTras(PIN_ESQ_VEL, PIN_ESQ_DIR, 255, MOTOR_ESQ_INVERTIDO); break;
+      case 'e': motorTras(PIN_DIR_VEL, PIN_DIR_DIR, 255, MOTOR_DIR_INVERTIDO); motorFrente(PIN_ESQ_VEL, PIN_ESQ_DIR, 255, MOTOR_ESQ_INVERTIDO); break;
+      case 'd': motorFrente(PIN_DIR_VEL, PIN_DIR_DIR, 255, MOTOR_DIR_INVERTIDO); motorTras(PIN_ESQ_VEL, PIN_ESQ_DIR, 255, MOTOR_ESQ_INVERTIDO); break;
+    }
+    delay(120);
+  }
   switch (a) {
     case 'f':   // frente
       motorFrente(PIN_DIR_VEL, PIN_DIR_DIR, v, MOTOR_DIR_INVERTIDO);
@@ -70,13 +81,13 @@ void aplicar(char a) {
       motorTras(PIN_DIR_VEL, PIN_DIR_DIR, v, MOTOR_DIR_INVERTIDO);
       motorTras(PIN_ESQ_VEL, PIN_ESQ_DIR, v, MOTOR_ESQ_INVERTIDO);
       break;
-    case 'e':   // esquerda (gira: esquerda para trás, direita para frente)
-      motorTras(PIN_ESQ_VEL, PIN_ESQ_DIR, v, MOTOR_ESQ_INVERTIDO);
-      motorFrente(PIN_DIR_VEL, PIN_DIR_DIR, v, MOTOR_DIR_INVERTIDO);
+    case 'e':   // esquerda (gira p/ esquerda: lado esquerdo p/ tras, lado direito p/ frente)
+      motorTras(PIN_DIR_VEL, PIN_DIR_DIR, v, MOTOR_DIR_INVERTIDO);
+      motorFrente(PIN_ESQ_VEL, PIN_ESQ_DIR, v, MOTOR_ESQ_INVERTIDO);
       break;
     case 'd':   // direita
-      motorFrente(PIN_ESQ_VEL, PIN_ESQ_DIR, v, MOTOR_ESQ_INVERTIDO);
-      motorTras(PIN_DIR_VEL, PIN_DIR_DIR, v, MOTOR_DIR_INVERTIDO);
+      motorFrente(PIN_DIR_VEL, PIN_DIR_DIR, v, MOTOR_DIR_INVERTIDO);
+      motorTras(PIN_ESQ_VEL, PIN_ESQ_DIR, v, MOTOR_ESQ_INVERTIDO);
       break;
     default:    // parar
       motorParar(PIN_DIR_VEL);
@@ -114,10 +125,16 @@ const char PAGINA[] PROGMEM = R"HTML(<!doctype html><html lang="pt-br"><head>
   <input type="range" min="0" max="255" value="__VEL__" id="sl" oninput="document.getElementById('vv').innerText=this.value" onchange="cmd('v='+this.value)">
 </div>
 <div class="st" id="st">-</div>
+<div style="margin-top:14px"><small>Teste de ligação (calibração):</small><br>
+ <button onclick="roda(1)" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3">teste lado 1</button>
+ <button onclick="roda(2)" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3">teste lado 2</button>
+</div>
 <script>
+var rep=null;
 function cmd(q){fetch('/cmd?'+q).then(r=>r.text()).then(t=>document.getElementById('st').innerText=t).catch(e=>{})}
-function ir(d,e){if(e)e.preventDefault();cmd('d='+d)}
-function parar(e){if(e)e.preventDefault();cmd('d=s')}
+function ir(d,e){if(e)e.preventDefault();cmd('d='+d);if(rep)clearInterval(rep);rep=setInterval(function(){cmd('d='+d)},250)}
+function parar(e){if(e)e.preventDefault();if(rep){clearInterval(rep);rep=null}cmd('d=s')}
+function roda(l){fetch('/roda?l='+l).then(r=>r.text()).then(t=>document.getElementById('st').innerText=t).catch(e=>{})}
 setInterval(function(){fetch('/status').then(r=>r.json()).then(j=>document.getElementById('st').innerText='ação: '+j.acao+' · vel: '+j.velocidade+' · IP: '+j.ip).catch(e=>{})},1500)
 </script></body></html>)HTML";
 
@@ -144,6 +161,45 @@ void rotaStatus() {
   String j = "{\"acao\":\"" + String(acao) + "\",\"velocidade\":" + String(velocidade)
            + ",\"ip\":\"" + WiFi.localIP().toString() + "\",\"comandos\":" + String(contador) + "}";
   server.send(200, "application/json", j);
+}
+
+// /roda?l=1 -> só o lado 1 (PIN_DIR = "direito" do codigo); l=2 -> só o lado 2
+// Serve para descobrir, na prática, qual canal move qual lado do carro.
+void rotaRoda() {
+  String l = server.arg("l");
+  Serial.print(F("[roda] testando lado "));
+  Serial.println(l);
+  if (l == "1") {
+    motorFrente(PIN_DIR_VEL, PIN_DIR_DIR, 220, MOTOR_DIR_INVERTIDO);
+  } else {
+    motorFrente(PIN_ESQ_VEL, PIN_ESQ_DIR, 220, MOTOR_ESQ_INVERTIDO);
+  }
+  delay(1500);
+  motorParar(PIN_DIR_VEL);
+  motorParar(PIN_ESQ_VEL);
+  acao = 's';
+  ultimoComando = millis();
+  server.send(200, "text/plain", "lado " + l + " girou pra frente por 1,5 s");
+}
+
+// /teste -> varredura: cada motor 1,2 s para frente e 1,2 s para trás (diagnóstico)
+void rotaTeste() {
+  Serial.println(F("[teste] varredura dos motores"));
+  Serial.println(F("[teste] DIREITO frente"));
+  digitalWrite(PIN_DIR_DIR, MOTOR_DIR_INVERTIDO ? HIGH : LOW);
+  analogWrite(PIN_DIR_VEL, 220); delay(1200);
+  Serial.println(F("[teste] DIREITO tras"));
+  digitalWrite(PIN_DIR_DIR, MOTOR_DIR_INVERTIDO ? LOW : HIGH);
+  analogWrite(PIN_DIR_VEL, 220); delay(1200); analogWrite(PIN_DIR_VEL, 0);
+  Serial.println(F("[teste] ESQUERDO frente"));
+  digitalWrite(PIN_ESQ_DIR, MOTOR_ESQ_INVERTIDO ? HIGH : LOW);
+  analogWrite(PIN_ESQ_VEL, 220); delay(1200);
+  Serial.println(F("[teste] ESQUERDO tras"));
+  digitalWrite(PIN_ESQ_DIR, MOTOR_ESQ_INVERTIDO ? LOW : HIGH);
+  analogWrite(PIN_ESQ_VEL, 220); delay(1200); analogWrite(PIN_ESQ_VEL, 0);
+  aplicar('s');
+  Serial.println(F("[teste] fim"));
+  server.send(200, "text/plain", "teste ok: direito f/t + esquerdo f/t (veja o serial)");
 }
 
 // ---------------------------------------------------------------- setup
@@ -188,6 +244,8 @@ void setup() {
   server.on("/", rotaPagina);
   server.on("/cmd", rotaCmd);
   server.on("/status", rotaStatus);
+  server.on("/teste", rotaTeste);
+  server.on("/roda", rotaRoda);
   server.onNotFound(rotaPagina);
   server.begin();
   Serial.println(F("pagina no ar. comandos: f/t/e/d/s + v=0..255"));
