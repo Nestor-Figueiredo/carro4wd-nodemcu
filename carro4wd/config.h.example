@@ -17,3 +17,4 @@
 
 #define DEADMAN_MS   700   // para sozinho se o comando parar de chegar
 #define VEL_PADRAO   200
+#define HOSTNAME     "carro4wd"

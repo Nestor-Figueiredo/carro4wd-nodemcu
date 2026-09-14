@@ -37,6 +37,9 @@
 #ifndef VEL_PADRAO
 #define VEL_PADRAO 200
 #endif
+#ifndef HOSTNAME
+#define HOSTNAME "carro4wd"      // nome que aparece no DHCP/DNS da casa
+#endif
 
 ESP8266WebServer server(80);
 int velocidade = VEL_PADRAO;
@@ -156,7 +159,12 @@ void setup() {
   analogWriteFreq(1000);
   aplicar('s');
 
+  WiFi.hostname(HOSTNAME);      // nome no DHCP (aparece como "carro4wd" no Pi-hole)
   WiFi.mode(WIFI_STA);
+  Serial.print(F("MAC do carrinho: "));
+  Serial.println(WiFi.macAddress());
+  Serial.print(F("hostname: "));
+  Serial.println(WiFi.hostname());
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.print(F("conectando ao WiFi "));
   Serial.print(WIFI_SSID);
