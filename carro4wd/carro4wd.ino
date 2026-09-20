@@ -60,6 +60,8 @@ int trim = 0;                 // -40..40 (compensa lado que puxa)
 char acao = 's';
 unsigned long ultimoComando = 0;
 unsigned long ultimaWifiOk = 0;
+unsigned long ultimaAtividade = 0;   // ultima requisicao HTTP (mantem o WiFi acordado)
+bool wifiRapido = true;              // false = em economia (modem sleep ligado)
 float bateria = 0;
 int wifiRssi = 0;
 
@@ -83,6 +85,7 @@ int comTrim(int v, int delta) {
 void aplicar(char a) {
   int vd = comTrim(velocidade, -trim);   // lado "direito" do codigo
   int ve = comTrim(velocidade, trim);    // lado "esquerdo" do codigo
+  ultimaAtividade = millis();
   bool partindo = (acao == 's' && a != 's');
   if (partindo) {                        // kick-start: vence a inercia
     vd = ve = 255;
@@ -154,6 +157,7 @@ const char PAGINA[] PROGMEM = R"HTML(<!doctype html><html lang="pt-br"><head>
  <input type="range" min="-40" max="40" value="0" id="tr" oninput="document.getElementById('tt').innerText=this.value" onchange="cmd('trim='+this.value)">
 </div>
 <div class="st" id="st">-</div>
+<div style="color:#8b949e;font-size:12px;margin-top:6px">Teclado: <b>setas</b> ou <b>W A S D</b> = direção · <b>espaço</b> = parar</div>
 <div style="margin-top:12px"><small>Calibração:</small><br>
  <button onclick="roda(1)" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3">teste lado 1</button>
  <button onclick="roda(2)" style="margin:4px;padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3">teste lado 2</button>
@@ -192,11 +196,26 @@ window.addEventListener('mouseup',soltar);
 setInterval(function(){fetch('/status').then(r=>r.json()).then(j=>{
   document.getElementById('st').innerText='ação: '+j.acao+' · vel: '+j.velocidade+' · bateria: '+j.bateria+'V · IP: '+j.ip;
 }).catch(e=>{});},1500)
+// ---- teclado ----
+var MAPA={'ArrowUp':'f','ArrowDown':'t','ArrowLeft':'e','ArrowRight':'d','w':'f','W':'f','s':'t','S':'t','a':'e','A':'e','d':'d','D':'d'};
+var teclaAtiva=null;
+function tecla(ev, pressionando){
+  var k=ev.key;
+  if(k===' '||k==='Spacebar'||k==='Escape'){ if(pressionando){ev.preventDefault(); teclaAtiva=null; parar();} return; }
+  var acao=MAPA[k];
+  if(!acao) return;
+  ev.preventDefault();
+  if(pressionando){ if(teclaAtiva!==acao){ teclaAtiva=acao; ir(acao); } }
+  else if(teclaAtiva===acao){ teclaAtiva=null; parar(); }
+}
+document.addEventListener('keydown',function(e){tecla(e,true)});
+document.addEventListener('keyup',function(e){tecla(e,false)});
 </script></body></html>)HTML";
 
 void rotaPagina() { server.send_P(200, "text/html", PAGINA); }
 
 void rotaCmd() {
+  ultimaAtividade = millis();
   if (server.hasArg("v")) {
     int v = server.arg("v").toInt();
     velocidade = (v < 0) ? 0 : (v > 255 ? 255 : v);
@@ -213,10 +232,12 @@ void rotaCmd() {
 }
 
 void rotaStatus() {
+  ultimaAtividade = millis();
   String j = "{\"acao\":\"" + String(acao) + "\",\"velocidade\":" + String(velocidade)
            + ",\"trim\":" + String(trim) + ",\"bateria\":" + String(bateria, 2)
            + ",\"wifi\":" + String(WiFi.status() == WL_CONNECTED ? "true" : "false")
            + ",\"rssi\":" + String(WiFi.RSSI())
+           + ",\"energia\":" + String(wifiRapido ? "rapido" : "economia")
            + ",\"ip\":\"" + WiFi.localIP().toString() + "\",\"comandos\":" + String(millis() / 1000) + "}";
   server.send(200, "application/json", j);
 }
@@ -253,7 +274,7 @@ void setup() {
 
   WiFi.hostname(HOSTNAME);
   WiFi.mode(WIFI_STA);
-  WiFi.setSleepMode(WIFI_NONE_SLEEP);   // sem modem-sleep: menos latencia (o carro "piscava" na rede)
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);   // acorda no boot; o loop alterna conforme o uso
   Serial.print(F("MAC: ")); Serial.println(WiFi.macAddress());
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   unsigned long t0 = millis();
@@ -295,6 +316,18 @@ void loop() {
   // bateria: le de vez em quando
   static unsigned long ultimaLeitura = 0;
   if (millis() - ultimaLeitura > 10000) { ultimaLeitura = millis(); lerBateria(); }
+
+  // WiFi adaptativo: acordado enquanto alguem usa (pagina aberta) e em economia quando ocioso
+  bool ativo = (acao != 's') || (millis() - ultimaAtividade < 8000);
+  if (ativo && !wifiRapido) {
+    WiFi.setSleepMode(WIFI_NONE_SLEEP);
+    wifiRapido = true;
+    Serial.println(F("[wifi] modo rapido (em uso)"));
+  } else if (!ativo && wifiRapido) {
+    WiFi.setSleepMode(WIFI_MODEM_SLEEP);
+    wifiRapido = false;
+    Serial.println(F("[wifi] economia (parado)"));
+  }
 
   // watchdog de WiFi: perdeu a rede => para
   if (WiFi.status() == WL_CONNECTED) {
