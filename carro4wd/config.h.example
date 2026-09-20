@@ -18,3 +18,7 @@
 #define DEADMAN_MS   700   // para sozinho se o comando parar de chegar
 #define VEL_PADRAO   200
 #define HOSTNAME     "carro4wd"
+
+#define OTA_PASSWORD "TROQUE_POR_UMA_SENHA"
+#define BAT_DIVISOR   2.0
+#define BAT_MIN       4.6
