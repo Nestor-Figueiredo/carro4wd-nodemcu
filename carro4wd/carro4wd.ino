@@ -170,9 +170,12 @@ function cmd(q){fetch('/cmd?'+q).then(r=>r.text()).then(t=>document.getElementBy
 function ir(d,e){if(e)e.preventDefault();cmd('d='+d);if(rep)clearInterval(rep);rep=setInterval(function(){cmd('d='+d)},250)}
 function parar(e){if(e)e.preventDefault();if(rep){clearInterval(rep);rep=null}cmd('d=s')}
 function roda(l){fetch('/roda?l='+l).then(r=>r.text()).then(t=>document.getElementById('st').innerText=t).catch(e=>{})}
-// ---- camera ----
-var camOn=false;
-function cam(){camOn=!camOn;var w=document.getElementById('camw'),i=document.getElementById('cam'),b=document.getElementById('bcam');if(camOn){i.src='http://192.168.1.162:81/stream';w.style.display='block';b.textContent='📷 câmera ON';}else{i.removeAttribute('src');w.style.display='none';b.textContent='📷 câmera';}}
+// ---- camera (polling /capture: mais robusto que MJPEG, nao trava a ESP32) ----
+var camT=null;
+function cam(){var w=document.getElementById('camw'),i=document.getElementById('cam'),b=document.getElementById('bcam');
+ if(camT){clearInterval(camT);camT=null;i.removeAttribute('src');w.style.display='none';b.textContent='📷 câmera';}
+ else{w.style.display='block';b.textContent='📷 câmera ON';
+  var f=function(){i.src='http://192.168.1.162/capture?t='+Date.now();};f();camT=setInterval(f,300);}}
 // ---- joystick ----
 var pad=document.getElementById('pad'), knob=document.getElementById('knob');
 var ativo=false, env=null, dir='s', vel=0;
