@@ -61,6 +61,7 @@ char acao = 's';
 unsigned long ultimoComando = 0;
 unsigned long ultimaWifiOk = 0;
 unsigned long ultimaAtividade = 0;   // ultima requisicao HTTP (mantem o WiFi acordado)
+unsigned long contadorComandos = 0;   // contador REAL de comandos (o antigo "comandos" era millis()/1000 = uptime)
 bool wifiRapido = true;              // false = em economia (modem sleep ligado)
 float bateria = 0;
 int wifiRssi = 0;
@@ -224,6 +225,7 @@ void rotaPagina() { server.send_P(200, "text/html", PAGINA); }
 
 void rotaCmd() {
   ultimaAtividade = millis();
+  contadorComandos++;
   if (server.hasArg("v")) {
     int v = server.arg("v").toInt();
     velocidade = (v < 0) ? 0 : (v > 255 ? 255 : v);
@@ -246,7 +248,13 @@ void rotaStatus() {
            + ",\"wifi\":" + String(WiFi.status() == WL_CONNECTED ? "true" : "false")
            + ",\"rssi\":" + String(WiFi.RSSI())
            + ",\"energia\":" + String(wifiRapido ? "rapido" : "economia")
-           + ",\"ip\":\"" + WiFi.localIP().toString() + "\",\"comandos\":" + String(millis() / 1000) + "}";
+           + ",\"ip\":\"" + WiFi.localIP().toString() + "\""
+           + ",\"uptime\":" + String(millis() / 1000)
+           + ",\"reset\":\"" + ESP.getResetReason() + "\""
+           + ",\"resetcod\":" + String(ESP.getResetInfoPtr()->reason)
+           + ",\"exccause\":" + String(ESP.getResetInfoPtr()->exccause)
+           + ",\"heap\":" + String(ESP.getFreeHeap())
+           + ",\"comandos\":" + String(contadorComandos) + "}";
   server.send(200, "application/json", j);
 }
 
