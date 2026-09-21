@@ -143,6 +143,8 @@ const char PAGINA[] PROGMEM = R"HTML(<!doctype html><html lang="pt-br"><head>
  .st{color:#8b949e;font-size:.8rem;margin-top:8px}
 </style></head><body>
 <h1>🚗 Carrinho 4WD</h1>
+<div id="camw" style="display:none;margin:0 auto 10px;max-width:320px"><img id="cam" alt="camera" style="width:100%;border-radius:12px;border:1px solid #30363d"></div>
+<div style="margin-bottom:8px"><button id="bcam" onclick="cam()" style="padding:8px 14px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3">📷 câmera</button></div>
 <div class="pad" id="pad"><div class="knob" id="knob"></div></div>
 <div class="grid">
   <button class="vazio"></button><button ontouchstart="ir('f',event)" onmousedown="ir('f',event)" ontouchend="parar(event)" onmouseup="parar(event)">▲</button><button class="vazio"></button>
@@ -168,6 +170,9 @@ function cmd(q){fetch('/cmd?'+q).then(r=>r.text()).then(t=>document.getElementBy
 function ir(d,e){if(e)e.preventDefault();cmd('d='+d);if(rep)clearInterval(rep);rep=setInterval(function(){cmd('d='+d)},250)}
 function parar(e){if(e)e.preventDefault();if(rep){clearInterval(rep);rep=null}cmd('d=s')}
 function roda(l){fetch('/roda?l='+l).then(r=>r.text()).then(t=>document.getElementById('st').innerText=t).catch(e=>{})}
+// ---- camera ----
+var camOn=false;
+function cam(){camOn=!camOn;var w=document.getElementById('camw'),i=document.getElementById('cam'),b=document.getElementById('bcam');if(camOn){i.src='http://192.168.1.162:81/stream';w.style.display='block';b.textContent='📷 câmera ON';}else{i.removeAttribute('src');w.style.display='none';b.textContent='📷 câmera';}}
 // ---- joystick ----
 var pad=document.getElementById('pad'), knob=document.getElementById('knob');
 var ativo=false, env=null, dir='s', vel=0;
