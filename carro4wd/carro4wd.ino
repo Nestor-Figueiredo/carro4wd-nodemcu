@@ -247,7 +247,7 @@ void rotaStatus() {
            + ",\"trim\":" + String(trim) + ",\"bateria\":" + String(bateria, 2)
            + ",\"wifi\":" + String(WiFi.status() == WL_CONNECTED ? "true" : "false")
            + ",\"rssi\":" + String(WiFi.RSSI())
-           + ",\"energia\":" + String(wifiRapido ? "rapido" : "economia")
+           + ",\"energia\":\"" + String(wifiRapido ? "rapido" : "economia") + "\""
            + ",\"ip\":\"" + WiFi.localIP().toString() + "\""
            + ",\"uptime\":" + String(millis() / 1000)
            + ",\"reset\":\"" + ESP.getResetReason() + "\""
