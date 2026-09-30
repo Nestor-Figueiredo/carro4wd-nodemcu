@@ -333,17 +333,9 @@ void loop() {
   static unsigned long ultimaLeitura = 0;
   if (millis() - ultimaLeitura > 10000) { ultimaLeitura = millis(); lerBateria(); }
 
-  // WiFi adaptativo: acordado enquanto alguem usa (pagina aberta) e em economia quando ocioso
-  bool ativo = (acao != 's') || (millis() - ultimaAtividade < 8000);
-  if (ativo && !wifiRapido) {
-    WiFi.setSleepMode(WIFI_NONE_SLEEP);
-    wifiRapido = true;
-    Serial.println(F("[wifi] modo rapido (em uso)"));
-  } else if (!ativo && wifiRapido) {
-    WiFi.setSleepMode(WIFI_MODEM_SLEEP);
-    wifiRapido = false;
-    Serial.println(F("[wifi] economia (parado)"));
-  }
+  // v3.7: WiFi FIXO em modo rapido. A alternancia dinamica de WiFi.setSleepMode()
+  // causava HARDWARE WATCHDOG (reset cod=1) no ESP8266 sob carga durante a conducao.
+  // 'wifiRapido' fica sempre true; o campo 'energia' do /status continua existindo.
 
   // watchdog de WiFi: perdeu a rede => para
   if (WiFi.status() == WL_CONNECTED) {
